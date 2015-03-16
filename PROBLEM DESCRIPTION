@@ -1,0 +1,18 @@
+ Please create a simple secure temporary file sharing service. The service should meet the following requirements:
+
+    Provide an API to upload files/folders. The API will return an HTTP link that can be used to retrieve the file/folder contents.
+    The files will be stored encrypted.
+    HTTP links will expire after a day and stop working.
+    Create a web front-end interface to upload files/folders.
+
+Please use any programming language, framework or (free) library you deem fit. It shouldn't take too much of your time – we place a lot of weight on sticking to a simple first implementation, accompanied by concrete suggestions on best ways to extend and move forward.
+
+We'll be paying close attention to your README with running instructions, TODOs, thoughts, and potential enhancements — so that's a real opportunity to shine.
+
+Bonus: deploy the application on Heroku, and send us a link to try it. 
+
+Please explicitly address:
+
+    Scalability: what are some of the considerations when you need to create and serve many links in parallel? What if people upload very big files?
+    Resiliency: how will you handle errors in various components of your system? How will you recover gracefully?
+    How would you support password-protection in addition to the encryption?
