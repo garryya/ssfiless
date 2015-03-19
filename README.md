@@ -1,6 +1,9 @@
 # ssfiless
 Secure temporary file sharing service
 
+**Questions/assumptions**
+* get file content returns what? 
+
 
 **TODO**
 * error handling
