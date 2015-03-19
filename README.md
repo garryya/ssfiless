@@ -52,7 +52,7 @@ configobj==4.7.2
 * test
   * POST, GET error handling
 * security
-  * no encryption keys on server or in-clear (!)
+  * no encryption keys on server or in-clear (very-very bad!!!)
     * client-side encryption? key provided by a client
   * authorization
   * encrypt configuration and DB
