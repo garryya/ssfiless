@@ -31,7 +31,7 @@ configobj==4.7.2
 ```
 ##### Get content - cUrl 
 ```
-> ./ssfilesss-client.py --server=localhost --action=get --path=2cbffc36-0c24-4f15-89ad-3735adeb1cef
+> curl -s -X GET -H "Content-Type: application/octet-stream" http://localhost:8080/2cbffc36-0c24-4f15-89ad-3735adeb1cef
 Twisted-Core==13.2.0
 Twisted-Web==13.2.0
 argparse==1.2.1
