@@ -53,14 +53,17 @@ configobj==4.7.2
 * get file content returns what? (maybe HTML: "<html>Hello, world!</html>")
 
 **TODO**
-* Folders (**requirements**)
 * HUGE files upload (**requirements**)
+  * idea: 
+    * client chunk and number it it, queue it, create a thread pool, each thread will pop from queue and send
+    * server will collect them and 
+    * probably separate REST resourse to be created to handle chunked transfer
+* improve error handling 
 * security
   * no encryption keys on server or in-clear (*very-very bad!!!*)
     * option1: client-side encryption? key provided by a client
     * option2: authirization + HMAC-based encryption 
   * encrypt configuration and DB
-* add folder recursion (?)
 * add service stuff: start/stop/restart 
 * file metadata storage: replace config-file with a DB (couchdb, postgres)
 * add json schema for REST APIs
