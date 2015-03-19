@@ -19,6 +19,8 @@ Uploaded
 * test
   * POST, GET error handling
 * error handling
-* replace config-file style filedata storage with DB (couchdb, postgres)
+* file metadata storage: replace config-file with a DB (couchdb, postgres)
 * add folder recursion
+* authorization
+* encryption keys...?
 * add json schema for REST APIs
