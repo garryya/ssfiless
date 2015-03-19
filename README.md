@@ -2,6 +2,7 @@
 #### Secure temporary file sharing service
 (see [problem description](https://github.com/garryya/ssfiless/blob/master/PROBLEM%20DESCRIPTION) for the details)
 
+* 2 components: server and command line tool front-end client
 * The server implemented as non-blocking REST server using Python Twisted engine, and supports the following REST commands
    * POST - upload a file/folder
    * GET - get file content
@@ -52,9 +53,8 @@ configobj==4.7.2
 * get file content returns what? (maybe HTML: "<html>Hello, world!</html>")
 
 **TODO**
-* HUGE files upload
-* test
-  * POST, GET error handling
+* Folders (**requirements**)
+* HUGE files upload (**requirements**)
 * security
   * no encryption keys on server or in-clear (very-very bad!!!)
     * client-side encryption? key provided by a client
