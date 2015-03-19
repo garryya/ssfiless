@@ -1,5 +1,5 @@
 # ssfiless
-### Secure temporary file sharing service
+#### Secure temporary file sharing service
 (see [problem description](https://github.com/garryya/ssfiless/blob/master/PROBLEM%20DESCRIPTION) for the details)
 
 * The server implemented as non-blocking REST server using Python Twisted engine, and supports the following REST commands
@@ -9,8 +9,10 @@
 * configuration and files metadata stored in conf-file style DB
 * 
 
+#### Client usage examples:
+##### Upload
+
 ```
-### Upload
 > ssfilesss-client.py --server=SERVER-ADDRESS --action=upload --path=FILENAME
 Uploading file FILENAME ...
 http://SERVER-ADDRESS:8080/e73e1ea3-88f7-4347-9ccc-719331d985ff
