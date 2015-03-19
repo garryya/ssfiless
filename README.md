@@ -10,6 +10,10 @@
 * files are stored encrypted on disk, encryption keys in DB next to the file (bad!) 
 * cleanup runs periodically and removes old files from both DB and disk (the frequency and file age are configurable)
 
+#### Testing
+The server is running on AWS micro instance. Use examples below and server=ec2-54-87-90-127.compute-1.amazonaws.com
+for testing
+
 #### Usage examples using client tool and the command line:
 ##### Upload
 ```
