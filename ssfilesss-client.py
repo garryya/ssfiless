@@ -7,7 +7,7 @@ import httplib2
 from datetime import datetime
 import simplejson
 
-file_actions = ['upload', 'get']
+file_actions = ['upload', 'get', 'delete']
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--server', required=True)
@@ -15,7 +15,7 @@ ap.add_argument('--action', choices=file_actions, required=True)
 ap.add_argument('--debug', action='store_const', dest='isDebug', const=True, default=False)
 ap.add_argument('--path')
 rap = ap.parse_args()
-print rap
+#print rap
 
 if rap.action in file_actions and not rap.path:
     print 'Please specify path or link for <', rap.action, '>'
@@ -31,29 +31,38 @@ def URI(action):
 
 def upload_file():
     print 'Uploading file', rap.path, '...'
-    file_name = os.path.basename(rap.path)
-    rd = {'file': file_name, 'folder':None}
+    file_name = os.path.abspath(rap.path)
     h = httplib2.Http()
     resp, content = h.request(URI(rap.action),
                               'POST',
-                              simplejson.dumps(rd),
-                              headers={'Content-Type': 'application/json'})
+                              open(file_name,'rb').read(),
+                              headers={'Content-Type': 'application/octet-stream'})
     #TODO really - eval ??
     print content
     print 'Upload%s' % (' failed' if not success(resp, content) else 'ed')
 
 
 def get_file_content():
-    print 'Getting remote file content', rap.path, '...'
+    #print 'Getting remote file content', rap.path, '...'
     h = httplib2.Http()
     resp, content = h.request(URI(rap.path),
                               'GET',
                               simplejson.dumps({}),
-                              headers={'Content-Type': 'application/json'})
+                              headers={'Content-Type': 'application/octet-stream'})
 
-    print 'got:', content
     if not success(resp, content):
         print 'File content request failed'
+    print content
+
+def delete_file():
+    print 'Getting remote file content', rap.path, '...'
+    h = httplib2.Http()
+    resp, content = h.request(URI(rap.path),
+                              'DELETE',
+                              simplejson.dumps({}),
+                              headers={'Content-Type': 'application/json'})
+
+    print 'File delet%s' % ('ion failed' if not success(resp, content) else 'ed')
 
 
 def upload_folder():
@@ -75,6 +84,8 @@ if __name__ == '__main__':
 
         elif rap.action == 'get':
             get_file_content()
+        elif rap.action == 'delete':
+            delete_file()
         else:
             print 'Unknown action <', rap.action, '>'
 

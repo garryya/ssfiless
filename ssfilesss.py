@@ -2,6 +2,7 @@
 
 from twisted.web import server, resource
 from twisted.internet import reactor, defer
+from twisted.internet.task import LoopingCall
 from configobj import ConfigObj
 import logging
 import commands
@@ -10,7 +11,9 @@ import argparse
 import simplejson
 import os
 import re
-
+import uuid
+import time
+from datetime import datetime, timedelta
 
 LOG = logging.getLogger("ssfiless")
 
@@ -22,30 +25,74 @@ class FileNotFoundException(Exception):
         return 'File not found: %s' % self._fname
 
 
+def use_filename_only(f):
+    def _f(*args,**kwargs):
+        args = (args[0], os.path.basename(args[1])) + args[2:]
+        return f(*args,**kwargs)
+    return _f
+
+class SSFileServerDB:
+    def __init__(self, dbname):
+        self._db = ConfigObj(dbname)
+        self._files_section = self._db['files']
+        for e in self._db['general']:
+            self.__dict__[e] = self._db['general'][e]
+
+    def read_all_files(self):
+        return ((f,self._files_section[f]) for f in self._files_section)
+
+    @use_filename_only
+    def read_file(self, fname):
+        return self._files_section[fname]
+
+    @use_filename_only
+    def file_exists(self, fname):
+        fname = os.path.basename(fname)
+        return fname in self._files_section
+
+    @use_filename_only
+    def add_file(self, fname, fdata):
+        fname = os.path.basename(fname)
+        self._files_section[os.path.basename(fname)] = fdata
+        self._db.write()
+
+    @use_filename_only
+    def delete_file(self, fname):
+        del self._files_section[fname]
+        self._db.write()
+
+
 class SSFileServer(resource.Resource):
 
     isLeaf = True
 
     def __init__(self):
-        self.db = ConfigObj('ssfilesss.conf')
-        self._files_section = self.db['files']
-        self._storage_location = os.path.abspath(self.db['general']['storage_location'])
+        self._db = SSFileServerDB('ssfilesss.conf')
+        self._storage_location = os.path.abspath(self._db.storage_location)
         if not os.path.exists(self._storage_location):
             os.makedirs(self._storage_location)
+        self._cleanupLoop = LoopingCall(self._cleanup)
+        self._cleanupLoop.start(int(self._db.cleanup_loop_interval)*60)
 
     #TODO - questionable...
-    def _uri(self, folder, fname):
+    def _uri(self, fname):
         ip = re.search( r'inet ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*eth0', commands.getoutput('ip a') ).groups()[0]
-        return 'http://%s:8080/%s' % (ip, os.path.join(folder, fname))
+        return 'http://%s:8080/%s' % (ip, fname)
 
-    def _get_local_path(self, fname):
+    def _get_local_file_path(self, fname):
         return os.path.join(self._storage_location, fname)
 
-    def _file_exists(self, path):
-        return path in self._files_section and os.path.exists(path)
+    def _file_exists(self, path, check_db_only=False):
+        return self._db.file_exists(path) and (check_db_only or os.path.exists(path))
+
+    def _generate_file_name(self, prefix=None):
+        fname = ''
+        if prefix:
+            fname += prefix + '_'
+        return fname + str(uuid.uuid4())
 
     def _ready(self, result, request):
-        LOG.debug('\tresult --> %s', result)
+        #LOG.debug('\tresult --> %s', result)
         request.write(result)
         request.finish()
 
@@ -58,16 +105,16 @@ class SSFileServer(resource.Resource):
     ##################
 
     def _upload(self, request):
-        data = simplejson.loads(request.content.read())
+        LOG.debug('Uploading...')
+        local_file_path = os.path.join(self._storage_location, self._generate_file_name())
+        with open(local_file_path,'w') as f:
+            f.write(request.content.read())
 
-        LOG.debug('Upload request %s', data)
+        #encrypt
 
-        folder = data['folder'] if 'folder' in data and data['folder'] else ''
-        upload_result = self._uri(folder, data['file'])
-
-        #....................
-
-        result = upload_result #simplejson.dumps(upload_result)
+        self._db.add_file(local_file_path, {'created':time.time(), 'completed':True})
+        result = self._uri(os.path.basename(local_file_path))
+        LOG.debug('\tdone (%s)', result)
         return result
 
     def render_POST(self, request):
@@ -79,16 +126,42 @@ class SSFileServer(resource.Resource):
 
     #################
 
-    def _get_content(self, request):
-        fname = os.path.basename(request.uri)
-        local_path = self._get_local_path(fname)
-        LOG.debug('File content request %s', local_path)
+    def _delete_file(self, file_path):
+        LOG.warning('\tDeleting %s', file_path)
+        self._db.delete_file(file_path)
+        try:
+            os.remove(file_path)
+        except:
+            pass
 
-        ###TODO check DB first !!!!!
-        if not self._file_exists(local_path):
+    def _delete(self, request):
+        fname = request.uri[1:]
+        local_file_path = self._get_local_file_path(fname)
+        LOG.debug('Deleting file %s...', local_file_path)
+        if not self._file_exists(local_file_path, check_db_only=True):
             request.setResponseCode(404)
             raise FileNotFoundException(fname)
-        result = 'XXX'
+        self._delete_file(local_file_path)
+        return ''
+
+    def render_DELETE(self, request):
+        LOG.debug('render_DELETE: uri=%s', request.uri)
+        d = defer.maybeDeferred(self._delete, request)
+        d.addCallback(self._ready, request)
+        d.addErrback(self._error, request)
+        return server.NOT_DONE_YET
+
+
+    #################
+
+    def _get_content(self, request):
+        fname = request.uri[1:]
+        local_file_path = self._get_local_file_path(fname)
+        LOG.debug('File content request %s', local_file_path)
+        if not self._file_exists(local_file_path):
+            request.setResponseCode(404)
+            raise FileNotFoundException(fname)
+        result = open(local_file_path,'rb').read()
         return result
 
     def render_GET(self, request):
@@ -98,7 +171,14 @@ class SSFileServer(resource.Resource):
         d.addErrback(self._error, request)
         return server.NOT_DONE_YET
 
-
+    def _cleanup(self):
+        LOG.debug('Cleanup started...')
+        max_file_age = int(self._db.max_file_age)
+        for f, fdata in self._db.read_all_files():
+            tdelta = datetime.fromtimestamp(time.time()) - datetime.fromtimestamp(float(fdata['created']))
+            if tdelta.days >= max_file_age:
+            #if tdelta.seconds >= max_file_age:
+                self._delete_file(self._get_local_file_path(f))
 
 
 
