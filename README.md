@@ -5,7 +5,7 @@
 * The server implemented as non-blocking REST server using Python Twisted engine, and supports the following REST commands
    * POST - upload a file/folder
    * GET - get file content
-   * DELETE - remove a file
+   * DELETE - remove a file (voluntary added, not in requirements)
 * configuration and files metadata stored in conf-file style DB
 * 
 
