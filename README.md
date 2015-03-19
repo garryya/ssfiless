@@ -61,6 +61,7 @@ configobj==4.7.2
     * option2: authirization + HMAC-based encryption 
   * encrypt configuration and DB
 * add folder recursion (?)
+* add service stuff: start/stop/restart 
 * file metadata storage: replace config-file with a DB (couchdb, postgres)
 * add json schema for REST APIs
 * GUI fron-end
