@@ -56,9 +56,9 @@ configobj==4.7.2
 * Folders (**requirements**)
 * HUGE files upload (**requirements**)
 * security
-  * no encryption keys on server or in-clear (very-very bad!!!)
-    * client-side encryption? key provided by a client
-  * authorization
+  * no encryption keys on server or in-clear (*very-very bad!!!*)
+    * option1: client-side encryption? key provided by a client
+    * option2: authirization + HMAC-based encryption 
   * encrypt configuration and DB
 * add folder recursion (?)
 * file metadata storage: replace config-file with a DB (couchdb, postgres)
