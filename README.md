@@ -1,6 +1,6 @@
 # ssfiless
 ### Secure temporary file sharing service
-(see https://github.com/garryya/ssfiless/blob/master/PROBLEM%20DESCRIPTION for details)
+(see [description](https://github.com/garryya/ssfiless/blob/master/PROBLEM%20DESCRIPTION) for details)
 
 
 ```
