@@ -7,6 +7,7 @@
    * GET - get file content
    * DELETE - remove a file (voluntary added, not in requirements)
 * configuration and files metadata stored in conf-file style DB (ssfiless.conf)
+* files are stored encrypted on disk, encryption keys in DB next to the file (bad!) 
 * cleanup runs periodically and removes old files from both DB and disk (the frequency and file age are configurable)
 
 #### Usage examples using client tool and the command line:
@@ -50,11 +51,12 @@ configobj==4.7.2
 * HUGE files upload
 * test
   * POST, GET error handling
-* file metadata storage: replace config-file with a DB (couchdb, postgres)
 * security
+  * no encryption keys on server or in-clear (!)
+    * client-side encryption? key provided by a client
   * authorization
   * encrypt configuration and DB
-  * no encryption keys on server (client-side?)
 * add folder recursion (?)
+* file metadata storage: replace config-file with a DB (couchdb, postgres)
 * add json schema for REST APIs
 * GUI fron-end
