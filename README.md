@@ -11,3 +11,4 @@ Secure temporary file sharing service
 * error handling
 * replace config-file style filedata storage with DB (couchdb, postgres)
 * add folder recursion
+* add json schema for REST APIs
