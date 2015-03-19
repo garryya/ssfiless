@@ -9,17 +9,39 @@
 * configuration and files metadata stored in conf-file style DB
 * 
 
-#### Client usage examples:
+#### Usage examples using client tool and the command line:
 ##### Upload
-
 ```
-> ssfilesss-client.py --server=SERVER-ADDRESS --action=upload --path=FILENAME
-Uploading file FILENAME ...
-http://SERVER-ADDRESS:8080/e73e1ea3-88f7-4347-9ccc-719331d985ff
+> ./ssfilesss-client.py --server=localhost --action=upload --path=requirements.txt
+Uploading file requirements.txt ...
+http://10.0.2.15:8080/2cbffc36-0c24-4f15-89ad-3735adeb1cef
 Uploaded
-
-> ssfilesss-client.py --server=SERVER-ADDRESS --action=get --path=FILENAME
 ```
+##### Get content
+```
+> ./ssfilesss-client.py --server=localhost --action=get --path=2cbffc36-0c24-4f15-89ad-3735adeb1cef
+Twisted-Core==13.2.0
+Twisted-Web==13.2.0
+argparse==1.2.1
+httplib2==0.8
+jsonschema==2.3.0
+simplejson==3.3.1
+zope.interface==4.0.5
+configobj==4.7.2
+```
+##### Get content - cUrl 
+```
+> ./ssfilesss-client.py --server=localhost --action=get --path=2cbffc36-0c24-4f15-89ad-3735adeb1cef
+Twisted-Core==13.2.0
+Twisted-Web==13.2.0
+argparse==1.2.1
+httplib2==0.8
+jsonschema==2.3.0
+simplejson==3.3.1
+zope.interface==4.0.5
+configobj==4.7.2
+```
+
 
 **Questions/assumptions**
 * get file content returns what? (maybe HTML: "<html>Hello, world!</html>")
