@@ -2,7 +2,7 @@
 Secure temporary file sharing service
 
 **Questions/assumptions**
-* get file content returns what? 
+* get file content returns what? (maybe HTML: "<html>Hello, world!</html>")
 
 
 **TODO**
