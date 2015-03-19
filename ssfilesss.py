@@ -2,6 +2,7 @@
 
 from twisted.web import server, resource
 from twisted.internet import reactor, defer
+from twisted.internet.defer import  inlineCallbacks, returnValue
 from twisted.internet.task import LoopingCall
 from configobj import ConfigObj
 import logging
@@ -158,21 +159,22 @@ class SSFileServer(resource.Resource):
 
     ##################
 
+    @inlineCallbacks
     def _upload(self, request):
         LOG.debug('Uploading...')
         local_file_path = os.path.join(self._storage_location, self._generate_file_name())
         with open(local_file_path,'w') as f:
             f.write(request.content.read())
 
-        encrypted, key = self._encrypt_file(local_file_path)
+        encrypted, key = yield self._encrypt_file(local_file_path)
         if not encrypted:
             request.setResponseCode(500) # internal
             raise FileCryptoFailed()
 
-        self._db.add_file(local_file_path, {'created':time.time(), 'completed':True, 'key':key})
+        yield self._db.add_file(local_file_path, {'created':time.time(), 'completed':True, 'key':key})
         result = self._uri(os.path.basename(local_file_path))
         LOG.debug('\tdone (%s)', result)
-        return result
+        returnValue(result)
 
     def render_POST(self, request):
         LOG.debug('render_POST: uri=%s', request.uri)
@@ -184,22 +186,23 @@ class SSFileServer(resource.Resource):
     #################
 
     def _delete_file(self, file_path):
-        LOG.warning('\tDeleting %s', file_path)
         self._db.delete_file(file_path)
         try:
             os.remove(file_path)
         except:
             pass
 
+    @inlineCallbacks
     def _delete(self, request):
         fname = request.uri[1:]
         local_file_path = self._get_local_file_path(fname)
         LOG.debug('Deleting file %s...', local_file_path)
-        if not self._file_exists(local_file_path, check_db_only=True):
+        exists = yield self._file_exists(local_file_path, check_db_only=True)
+        if not exists:
             request.setResponseCode(404)
             raise FileNotFoundException(fname)
         self._delete_file(local_file_path)
-        return ''
+        returnValue('')
 
     def render_DELETE(self, request):
         LOG.debug('render_DELETE: uri=%s', request.uri)
@@ -211,6 +214,7 @@ class SSFileServer(resource.Resource):
 
     #################
 
+    @inlineCallbacks
     def _get_content(self, request):
         fname = request.uri[1:]
         local_file_path = self._get_local_file_path(fname)
@@ -218,14 +222,15 @@ class SSFileServer(resource.Resource):
         if not self._file_exists(local_file_path):
             request.setResponseCode(404)
             raise FileNotFoundException(fname)
-        fdata = self._db.read_file(local_file_path)
+        fdata = yield self._db.read_file(local_file_path)
         result = None
         with SecTempFile() as sf:
-            if not self._decrypt_file(local_file_path, fdata['key'], sf.fname):
+            decrypted = yield self._decrypt_file(local_file_path, fdata['key'], sf.fname)
+            if not decrypted:
                 request.setResponseCode(500) # internal
                 raise FileCryptoFailed()
             result = open(sf.fname,'rb').read()
-        return result
+        returnValue(result)
 
     def render_GET(self, request):
         LOG.debug('render_GET: uri=%s', request.uri)
@@ -255,7 +260,7 @@ if rap.isDebug:
 if __name__ == '__main__':
     filename = __file__[:__file__.rfind('.')+1]
     FMT = "%(asctime)s - %(name)-6s - %(levelname)-6s - [%(filename)s:%(lineno)d] - %(message)s"
-    logging.basicConfig(filename=filename+'log',
+    logging.basicConfig(filename='/var/log/'+os.path.basename(filename)+'log',
                         level=logging.DEBUG if rap.isDebug else logging.INFO,
                         format=(FMT))
     if rap.isDebug:
