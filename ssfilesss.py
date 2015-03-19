@@ -5,7 +5,6 @@ from twisted.internet import reactor, defer
 from twisted.internet.task import LoopingCall
 from configobj import ConfigObj
 import logging
-import commands
 import sys
 import argparse
 import simplejson
@@ -13,17 +12,41 @@ import os
 import re
 import uuid
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
+import commands
+from tempfile import mkstemp, mktemp
 
 LOG = logging.getLogger("ssfiless")
-
 
 class FileNotFoundException(Exception):
     def __init__(self,fname=''):
         self._fname = fname
     def __str__(self):
         return 'File not found: %s' % self._fname
+class FileCryptoFailed(Exception):
+    def __init__(self,fname=''):
+        self._fname = fname
+    def __str__(self):
+        return 'File encryption failed: %s' % self._fname
 
+
+def runcmd( cmd, ignore_status=False):
+    status, output = commands.getstatusoutput( cmd )
+    if status != 0 and not ignore_status:
+        LOG.error("error running <%s> : %d <%s>", cmd, status, output)
+        return status, None
+    LOG.info("running <%s> --> s=%d", cmd, status)
+    return status, output
+
+class SecTempFile:
+    def __init__(self):
+        self.fname = mktemp()
+    def _delete(self):
+        runcmd("rm -f %s" % self.fname)
+    def __enter__(self):
+        return self
+    def __exit__(self, type, value, traceback):
+        self._delete()
 
 def use_filename_only(f):
     def _f(*args,**kwargs):
@@ -33,6 +56,7 @@ def use_filename_only(f):
 
 class SSFileServerDB:
     def __init__(self, dbname):
+        LOG.debug('Loading DB & configuration from %s...', dbname)
         self._db = ConfigObj(dbname)
         self._files_section = self._db['files']
         for e in self._db['general']:
@@ -66,18 +90,28 @@ class SSFileServer(resource.Resource):
 
     isLeaf = True
 
-    def __init__(self):
-        self._db = SSFileServerDB('ssfilesss.conf')
+    def __init__(self, config=None):
+        self._db = SSFileServerDB(config if config else 'ssfilesss.conf')
         self._storage_location = os.path.abspath(self._db.storage_location)
         if not os.path.exists(self._storage_location):
             os.makedirs(self._storage_location)
         self._cleanupLoop = LoopingCall(self._cleanup)
         self._cleanupLoop.start(int(self._db.cleanup_loop_interval)*60)
 
-    #TODO - questionable...
+    def _get_public_ip_amazon(self):
+        s, o = runcmd('curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/public-hostname')
+        if s or not o:
+            return None
+        return o
+
+    def _get_public_ip(self):
+        ip = self._get_public_ip_amazon()
+        if not ip:
+            ip = re.search( r'inet ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*eth0', commands.getoutput('ip a') ).groups()[0]
+        return ip
+
     def _uri(self, fname):
-        ip = re.search( r'inet ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*eth0', commands.getoutput('ip a') ).groups()[0]
-        return 'http://%s:8080/%s' % (ip, fname)
+        return 'http://%s:8080/%s' % (self._get_public_ip(), fname)
 
     def _get_local_file_path(self, fname):
         return os.path.join(self._storage_location, fname)
@@ -102,6 +136,26 @@ class SSFileServer(resource.Resource):
         request.write(simplejson.dumps(failure))
         request.finish()
 
+    def _encrypt_file(self, path):
+        ''' Encrypts a file with created key, replaces the original and returns the key
+        '''
+        key = str(uuid.uuid4())
+        s, o = runcmd('openssl aes-256-cbc -a -salt -in %s -pass pass:%s -out %s.enc' % (path, key, path))
+        if s:
+            return False, None
+        s, o = runcmd('mv %s.enc %s' % (path, path))
+        if s:
+            return False, None
+        return True, key
+
+    def _decrypt_file(self, path, key, tempfile):
+        ''' Decrypts a file into temp file, file will be removed immediately after sending
+        '''
+        s, o = runcmd('openssl aes-256-cbc -a -d -in %s -pass pass:%s -out %s' % (path, key, tempfile))
+        if s:
+            return False
+        return True
+
     ##################
 
     def _upload(self, request):
@@ -110,9 +164,12 @@ class SSFileServer(resource.Resource):
         with open(local_file_path,'w') as f:
             f.write(request.content.read())
 
-        #encrypt
+        encrypted, key = self._encrypt_file(local_file_path)
+        if not encrypted:
+            request.setResponseCode(500) # internal
+            raise FileCryptoFailed()
 
-        self._db.add_file(local_file_path, {'created':time.time(), 'completed':True})
+        self._db.add_file(local_file_path, {'created':time.time(), 'completed':True, 'key':key})
         result = self._uri(os.path.basename(local_file_path))
         LOG.debug('\tdone (%s)', result)
         return result
@@ -161,7 +218,13 @@ class SSFileServer(resource.Resource):
         if not self._file_exists(local_file_path):
             request.setResponseCode(404)
             raise FileNotFoundException(fname)
-        result = open(local_file_path,'rb').read()
+        fdata = self._db.read_file(local_file_path)
+        result = None
+        with SecTempFile() as sf:
+            if not self._decrypt_file(local_file_path, fdata['key'], sf.fname):
+                request.setResponseCode(500) # internal
+                raise FileCryptoFailed()
+            result = open(sf.fname,'rb').read()
         return result
 
     def render_GET(self, request):
@@ -172,18 +235,19 @@ class SSFileServer(resource.Resource):
         return server.NOT_DONE_YET
 
     def _cleanup(self):
-        LOG.debug('Cleanup started...')
-        max_file_age = int(self._db.max_file_age)
+        max_file_age_seconds = int(self._db.max_file_age_seconds)
+        max_file_age_days = int(self._db.max_file_age_days)
+        LOG.debug('Cleaning up... (s=%d, d=%s)', max_file_age_seconds, max_file_age_days)
         for f, fdata in self._db.read_all_files():
             tdelta = datetime.fromtimestamp(time.time()) - datetime.fromtimestamp(float(fdata['created']))
-            if tdelta.days >= max_file_age:
-            #if tdelta.seconds >= max_file_age:
+            if max_file_age_seconds != -1 and tdelta.seconds >= max_file_age_seconds or tdelta.days >= max_file_age_days:
                 self._delete_file(self._get_local_file_path(f))
 
 
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--debug', action='store_const', dest='isDebug', const=True, default=False)
+ap.add_argument('--config')
 rap = ap.parse_args()
 if rap.isDebug:
     print 'Debug mode is ON'
@@ -201,7 +265,7 @@ if __name__ == '__main__':
         LOG.addHandler(ch)
 
     LOG.info('Starting service...')
-    root = SSFileServer()
+    root = SSFileServer(rap.config)
     site = server.Site(root)
     reactor.listenTCP(8080,site)
     reactor.run()
