@@ -6,8 +6,8 @@
    * POST - upload a file/folder
    * GET - get file content
    * DELETE - remove a file (voluntary added, not in requirements)
-* configuration and files metadata stored in conf-file style DB
-* 
+* configuration and files metadata stored in conf-file style DB (ssfiless.conf)
+* cleanup runs periodically and removes old files from both DB and disk (the frequency and file age are configurable)
 
 #### Usage examples using client tool and the command line:
 ##### Upload
