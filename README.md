@@ -1,6 +1,5 @@
 # ssfiless
-## Secure temporary file sharing service
-
+### Secure temporary file sharing service
 (see https://github.com/garryya/ssfiless/blob/master/PROBLEM%20DESCRIPTION for details)
 
 
@@ -17,9 +16,14 @@ Uploaded
 * get file content returns what? (maybe HTML: "<html>Hello, world!</html>")
 
 **TODO**
+* HUGE files upload
 * test
   * POST, GET error handling
 * file metadata storage: replace config-file with a DB (couchdb, postgres)
-* authorization
+* security
+  * authorization
+  * encrypt configuration and DB
+  * no encryption keys on server (client-side?)
 * add folder recursion (?)
 * add json schema for REST APIs
+* GUI fron-end
