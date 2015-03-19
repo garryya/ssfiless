@@ -10,9 +10,10 @@
 * 
 
 ```
+### Upload
 > ssfilesss-client.py --server=SERVER-ADDRESS --action=upload --path=FILENAME
 Uploading file FILENAME ...
-http://10.0.2.15:8080/FILENAME
+http://SERVER-ADDRESS:8080/e73e1ea3-88f7-4347-9ccc-719331d985ff
 Uploaded
 
 > ssfilesss-client.py --server=SERVER-ADDRESS --action=get --path=FILENAME
